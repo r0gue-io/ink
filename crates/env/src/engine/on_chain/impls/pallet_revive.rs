@@ -191,7 +191,8 @@ impl EnvInstance {
         let u256: &mut [u8; 32] = scope.take(32).try_into().unwrap();
         ext_fn(u256);
         let mut result = <T as FromLittleEndian>::Bytes::default();
-        result.as_mut()[..16].copy_from_slice(&u256[..16]);
+        let len = result.as_ref().len();
+        result.as_mut()[..].copy_from_slice(&u256[..len]);
         <T as FromLittleEndian>::from_le_bytes(result)
     }
 
