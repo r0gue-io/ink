@@ -393,11 +393,12 @@ impl EnvBackend for EnvInstance {
 impl TypedEnvBackend for EnvInstance {
     fn caller<E: Environment>(&mut self) -> E::AccountId {
         let mut scope = self.scoped_buffer();
-        let h160: &mut [u8; 20] = scope.take(20).try_into().unwrap();
-        ext::caller(h160);
+
         let account_id: &mut [u8; 32] = scope.take(32).try_into().unwrap();
         account_id[20..].fill(0xEE);
-        account_id[..20].copy_from_slice(h160);
+        let h160: &mut [u8; 20] = account_id[..20].as_mut().try_into().unwrap();
+        ext::caller(h160);
+
         scale::Decode::decode(&mut &account_id[..])
             .expect("The executed contract must have a caller with a valid account id.")
     }
@@ -416,11 +417,12 @@ impl TypedEnvBackend for EnvInstance {
 
     fn account_id<E: Environment>(&mut self) -> E::AccountId {
         let mut scope = self.scoped_buffer();
-        let h160: &mut [u8; 20] = scope.take(20).try_into().unwrap();
-        ext::address(h160);
+
         let account_id: &mut [u8; 32] = scope.take(32).try_into().unwrap();
         account_id[20..].fill(0xEE);
-        account_id[..20].copy_from_slice(h160);
+        let h160: &mut [u8; 20] = account_id[..20].as_mut().try_into().unwrap();
+        ext::address(h160);
+
         scale::Decode::decode(&mut &account_id[..])
             .expect("A contract being executed must have a valid account id.")
     }
@@ -612,12 +614,7 @@ impl TypedEnvBackend for EnvInstance {
         E: Environment,
     {
         let mut scope = self.scoped_buffer();
-        // TODO: use account mapping
-        let enc_destination = scope.take(32);
-        let mut encode_scope = EncodeScope::from(enc_destination);
-        scale::Encode::encode_to(&destination, &mut encode_scope);
-        let enc_destination: &mut [u8; 20] =
-            array_mut_ref!(encode_scope.into_buffer(), 0, 20);
+        let enc_destination: &mut [u8; 20] = scope.take_encoded(&destination)[..20].as_mut().try_into().unwrap();
         let enc_value = scope.take(32);
         let mut encode_scope = EncodeScope::from(enc_value);
         scale::Encode::encode_to(&value, &mut encode_scope);
@@ -642,7 +639,7 @@ impl TypedEnvBackend for EnvInstance {
     {
         let mut scope = self.scoped_buffer();
         let enc_account_id: &mut [u8; 20] =
-            scope.take_encoded(account_id).try_into().unwrap();
+            scope.take_encoded(account_id)[..20].as_mut().try_into().unwrap();
         ext::is_contract(enc_account_id)
     }
 
@@ -658,11 +655,9 @@ impl TypedEnvBackend for EnvInstance {
         E: Environment,
     {
         let mut scope = self.scoped_buffer();
+        let enc_account_id: &mut [u8; 20] = scope.take_encoded(account_id)[..20].as_mut().try_into().unwrap();
         let output: &mut [u8; 32] =
             scope.take_max_encoded_len::<E::Hash>().try_into().unwrap();
-        scope.append_encoded(account_id);
-        let enc_account_id: &mut [u8; 20] = scope.take_appended().try_into().unwrap();
-
         ext::code_hash(enc_account_id, output)?;
         let hash = scale::Decode::decode(&mut &output[..])?;
         Ok(hash)
