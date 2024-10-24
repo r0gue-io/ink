@@ -394,10 +394,11 @@ impl TypedEnvBackend for EnvInstance {
     fn caller<E: Environment>(&mut self) -> E::AccountId {
         let mut scope = self.scoped_buffer();
 
-        let account_id: &mut [u8; 32] = scope.take(32).try_into().unwrap();
-        account_id[20..].fill(0xEE);
-        let h160: &mut [u8; 20] = account_id[..20].as_mut().try_into().unwrap();
+        let h160: &mut [u8; 20] = scope.take(20).try_into().unwrap();
         ext::caller(h160);
+
+        let account_id: &mut [u8; 32] = scope.take(32).try_into().unwrap();
+        ext::to_account_id(h160, account_id);
 
         scale::Decode::decode(&mut &account_id[..])
             .expect("The executed contract must have a caller with a valid account id.")
@@ -603,7 +604,7 @@ impl TypedEnvBackend for EnvInstance {
     {
         let buffer: &mut [u8; 20] = self
             .scoped_buffer()
-            .take_encoded(&beneficiary)
+            .take_encoded(&beneficiary)[0..20].as_mut()
             .try_into()
             .unwrap();
         ext::terminate(buffer);
